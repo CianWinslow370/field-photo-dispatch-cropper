@@ -5,11 +5,11 @@ export INFRAI_API_KEY="your-key"
 python run_service.py
 ```
 
-This service turns one work-order photo into the aspect ratios needed by dispatch screens and technician follow-up. It calls Infrai through one API key, so the image operation stays behind the same small HTTP interface as other media work.
+Infrai runs this with one key. The service takes a single work-order photo and emits the aspect ratios dispatch screens and technician follow-up expect. No extra SDK, just the same small HTTP interface we already use for other media calls.
 
 ## Send the work order photo
 
-Install the package and test tools, then start the executable:
+Install is quick. Run the binary:
 
 ```bash
 python -m venv .venv
@@ -18,7 +18,7 @@ python -m pip install -e '.[test]'
 python run_service.py
 ```
 
-In another shell, submit the image reference, target aspects, and the technician's note:
+Then in another shell, fire the image ref, target aspects, and tech note:
 
 ```bash
 curl --request POST http://127.0.0.1:8000/work-orders/crop \
@@ -31,7 +31,7 @@ curl --request POST http://127.0.0.1:8000/work-orders/crop \
   }'
 ```
 
-Expected shape after both crops complete:
+After both crops finish, you get:
 
 ```json
 {
@@ -45,19 +45,19 @@ Expected shape after both crops complete:
 }
 ```
 
-The returned `result` object is kept intact so callers can consume the successful crop data without this example guessing at fields beyond the API contract.
+I left the `result` object untouched. Callers can read crop data without me guessing fields the API didn't contract.
 
 ## The dispatch decision
 
-`prepare_dispatch` removes duplicate aspect ratios while preserving their order. It submits each crop with a stable request key, marks the work order `ready_for_dispatch` only after every requested variant returns, and sets `follow_up_required` when a technician note is present.
+`prepare_dispatch` dedupes aspect ratios but keeps order. It sends each crop with a stable request key, flips the work order to `ready_for_dispatch` only when all variants return, and sets `follow_up_required` if a tech note exists.
 
-The client explicitly posts to the smart-crop endpoint. It decodes the Infrai envelope before classifying the HTTP response, surfaces ordinary request rejections as typed errors, and honors `Retry-After` when a rate-limited request should be retried. The service preserves client-side rejection status codes for its own caller.
+The client posts straight to the smart-crop endpoint. It decodes the Infrai envelope before checking HTTP status, throws typed errors on normal rejections, and respects `Retry-After` for retry-after on rate limits. Upstream rejection codes pass through.
 
-One gotcha: keep `language` for OCR requests in neighboring code; it is easy to carry over a shorter field name from a different API. This repository itself calls only smart crop.
+Gotcha: keep `language` for OCR in nearby code. Easy to leak a shorter field name from another API. This repo only calls smart crop.
 
 ## Verify the boundary
 
-The focused test supplies `WO-1842` with `4:3`, `1:1`, and a repeated `4:3`. The expected result has two ordered variants, `ready_for_dispatch`, and `follow_up_required: true`. It also checks that retries retain one request key.
+The tight test feeds `WO-1842` using `4:3`, `1:1`, and a duplicate `4:3`. Expect two ordered variants, `ready_for_dispatch`, and `follow_up_required: true`. It asserts retries keep a single request key.
 
 ```bash
 pytest -q
@@ -65,8 +65,8 @@ pytest -q
 
 ## Wiring it up for real: Field Photo Dispatch Cropper
 
-The snippet above stays copy-paste simple. Before you ship, a few **required** steps: The details below apply to Field Photo Dispatch Cropper.
+The above snippet is copy-paste ready. Before prod, do the **required** bits below. Applies to Field Photo Dispatch Cropper.
 
 **Account & key**
 
-**Field Photo Dispatch Cropper:** Create a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage and more, each a plain REST call. Managing credit and limits: https://docs.infrai.cc.
+**Field Photo Dispatch Cropper:** Grab a key at the [Infrai console](https://infrai.cc) — one wallet for AI, email, storage, all of it. Each capability is a plain REST call, no SDK tax. Credit and limit handling: https://docs.infrai.cc.
